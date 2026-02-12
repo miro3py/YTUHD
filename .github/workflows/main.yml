@@ -1,4 +1,4 @@
-name: Build YTUHD dylib (Auto CI)
+name: Build YTUHD dylib (FULL AUTO STABLE)
 
 on:
   workflow_dispatch:
@@ -8,55 +8,70 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      # --------------------------------
+      # Checkout source
+      # --------------------------------
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # ---------------------------
+      # --------------------------------
       # Install Theos
-      # ---------------------------
+      # --------------------------------
       - name: Install Theos
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
 
-      # ---------------------------
-      # Install dependencies
-      # ---------------------------
+      # --------------------------------
+      # Install build deps
+      # --------------------------------
       - name: Install dependencies
         run: |
           brew install ldid make dpkg
 
-      # ---------------------------
-      # Fetch missing YouTube headers
-      # (FIXES HAMDefaultABRPolicy.h error)
-      # ---------------------------
-      - name: Clone YouTubeHeader dependency
+      # --------------------------------
+      # Fetch ALL missing headers
+      # --------------------------------
+      - name: Clone YouTubeHeader
         run: |
-          git clone https://github.com/PoomSmart/YouTubeHeader.git YouTubeHeader
+          git clone https://github.com/PoomSmart/YouTubeHeader.git
 
-      # ---------------------------
-      # Build tweak as dylib
+      - name: Clone PSHeader
+        run: |
+          git clone https://github.com/PoomSmart/PSHeader.git
+
+      # --------------------------------
+      # Fix include search path
+      # (GitHub runner nema THEOS include auto)
+      # --------------------------------
+      - name: Export header include paths
+        run: |
+          echo "ADDITIONAL_CFLAGS=-I$GITHUB_WORKSPACE/YouTubeHeader -I$GITHUB_WORKSPACE/PSHeader" >> $GITHUB_ENV
+
+      # --------------------------------
+      # Build tweak dylib
       # SIDELOAD=1 disables undirect lib
-      # ---------------------------
+      # FINALPACKAGE=0 skips deb packaging
+      # --------------------------------
       - name: Build YTUHD dylib
         run: |
           export THEOS=$HOME/theos
           make clean
           make SIDELOAD=1 FINALPACKAGE=0
 
-      # ---------------------------
-      # Locate dylib automatically
-      # ---------------------------
-      - name: Find dylib
+      # --------------------------------
+      # Locate dylib safely
+      # --------------------------------
+      - name: Locate dylib
         id: dylib
         run: |
-          FILE=$(find .theos -name "YTUHD.dylib" | head -n 1)
+          FILE=$(find .theos -type f -name "YTUHD.dylib" | head -n 1)
           echo "file=$FILE" >> $GITHUB_OUTPUT
-          echo "Found dylib at $FILE"
+          echo "Found $FILE"
 
-      # ---------------------------
-      # Create draft GitHub release
-      # ---------------------------
+      # --------------------------------
+      # Create draft release
+      # --------------------------------
       - name: Create Draft Release
         uses: softprops/action-gh-release@v2
         with:
