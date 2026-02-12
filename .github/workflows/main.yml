@@ -1,4 +1,4 @@
-name: Build YTUHD dylib (Sideload)
+name: Build YTUHD dylib (Auto CI)
 
 on:
   workflow_dispatch:
@@ -8,36 +8,61 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
+      # ---------------------------
+      # Install Theos
+      # ---------------------------
       - name: Install Theos
         run: |
           git clone --recursive https://github.com/theos/theos.git $HOME/theos
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
 
-      - name: Install deps
+      # ---------------------------
+      # Install dependencies
+      # ---------------------------
+      - name: Install dependencies
         run: |
           brew install ldid make dpkg
 
-      - name: Build dylib (SIDELOAD=1)
+      # ---------------------------
+      # Fetch missing YouTube headers
+      # (FIXES HAMDefaultABRPolicy.h error)
+      # ---------------------------
+      - name: Clone YouTubeHeader dependency
+        run: |
+          git clone https://github.com/PoomSmart/YouTubeHeader.git YouTubeHeader
+
+      # ---------------------------
+      # Build tweak as dylib
+      # SIDELOAD=1 disables undirect lib
+      # ---------------------------
+      - name: Build YTUHD dylib
         run: |
           export THEOS=$HOME/theos
           make clean
-          make SIDELOAD=1
+          make SIDELOAD=1 FINALPACKAGE=0
 
+      # ---------------------------
+      # Locate dylib automatically
+      # ---------------------------
       - name: Find dylib
         id: dylib
         run: |
           FILE=$(find .theos -name "YTUHD.dylib" | head -n 1)
           echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "Found dylib at $FILE"
 
+      # ---------------------------
+      # Create draft GitHub release
+      # ---------------------------
       - name: Create Draft Release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          tag_name: manual-${{ github.run_number }}
-          name: YTUHD manual build ${{ github.run_number }}
+          tag_name: build-${{ github.run_number }}
+          name: YTUHD CI Build ${{ github.run_number }}
           files: ${{ steps.dylib.outputs.file }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
