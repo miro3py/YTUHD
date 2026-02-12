@@ -1,0 +1,43 @@
+name: Build YTUHD dylib (Sideload)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Theos
+        run: |
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
+          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+
+      - name: Install deps
+        run: |
+          brew install ldid make dpkg
+
+      - name: Build dylib (SIDELOAD=1)
+        run: |
+          export THEOS=$HOME/theos
+          make clean
+          make SIDELOAD=1
+
+      - name: Find dylib
+        id: dylib
+        run: |
+          FILE=$(find .theos -name "YTUHD.dylib" | head -n 1)
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          tag_name: manual-${{ github.run_number }}
+          name: YTUHD manual build ${{ github.run_number }}
+          files: ${{ steps.dylib.outputs.file }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
