@@ -1,4 +1,5 @@
-name: Build YTUHD dylib (FULL AUTO STABLE)
+001"}
+name: Build YTUHD dylib (Clean CI)
 
 on:
   workflow_dispatch:
@@ -8,76 +9,79 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # --------------------------------
-      # Checkout source
-      # --------------------------------
-      - name: Checkout repo
-        uses: actions/checkout@v4
+    # -----------------------------
+    # Checkout repo
+    # -----------------------------
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      # --------------------------------
-      # Install Theos
-      # --------------------------------
-      - name: Install Theos
-        run: |
-          git clone --recursive https://github.com/theos/theos.git $HOME/theos
-          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+    # -----------------------------
+    # Install Theos
+    # -----------------------------
+    - name: Install Theos
+      run: |
+        git clone --recursive https://github.com/theos/theos.git $HOME/theos
+        echo "THEOS=$HOME/theos" >> $GITHUB_ENV
 
-      # --------------------------------
-      # Install build deps
-      # --------------------------------
-      - name: Install dependencies
-        run: |
-          brew install ldid make dpkg
+    # -----------------------------
+    # Install deps
+    # -----------------------------
+    - name: Install dependencies
+      run: |
+        brew install ldid dpkg make
 
-      # --------------------------------
-      # Fetch ALL missing headers
-      # --------------------------------
-      - name: Clone YouTubeHeader
-        run: |
-          git clone https://github.com/PoomSmart/YouTubeHeader.git
+    # -----------------------------
+    # Clone required headers
+    # -----------------------------
+    - name: Clone YouTubeHeader
+      run: git clone https://github.com/PoomSmart/YouTubeHeader.git
 
-      - name: Clone PSHeader
-        run: |
-          git clone https://github.com/PoomSmart/PSHeader.git
+    - name: Clone PSHeader
+      run: git clone https://github.com/PoomSmart/PSHeader.git
 
-      # --------------------------------
-      # Fix include search path
-      # (GitHub runner nema THEOS include auto)
-      # --------------------------------
-      - name: Export header include paths
-        run: |
-          echo "ADDITIONAL_CFLAGS=-I$GITHUB_WORKSPACE/YouTubeHeader -I$GITHUB_WORKSPACE/PSHeader" >> $GITHUB_ENV
+    # -----------------------------
+    # FIX: Xcode16 CoreImage conflict
+    # PSHeader/CoreImage shadowuje Apple CoreImage
+    # -----------------------------
+    - name: Fix PSHeader CoreImage conflict
+      run: |
+        rm -rf PSHeader/CoreImage
 
-      # --------------------------------
-      # Build tweak dylib
-      # SIDELOAD=1 disables undirect lib
-      # FINALPACKAGE=0 skips deb packaging
-      # --------------------------------
-      - name: Build YTUHD dylib
-        run: |
-          export THEOS=$HOME/theos
-          make clean
-          make SIDELOAD=1 FINALPACKAGE=0
+    # -----------------------------
+    # Export include paths
+    # -----------------------------
+    - name: Setup include paths
+      run: |
+        echo "ADDITIONAL_CFLAGS=-I$GITHUB_WORKSPACE/YouTubeHeader -I$GITHUB_WORKSPACE/PSHeader" >> $GITHUB_ENV
 
-      # --------------------------------
-      # Locate dylib safely
-      # --------------------------------
-      - name: Locate dylib
-        id: dylib
-        run: |
-          FILE=$(find .theos -type f -name "YTUHD.dylib" | head -n 1)
-          echo "file=$FILE" >> $GITHUB_OUTPUT
-          echo "Found $FILE"
+    # -----------------------------
+    # Build dylib (SIDeload mode)
+    # -----------------------------
+    - name: Build YTUHD
+      run: |
+        export THEOS=$HOME/theos
+        make clean
+        make SIDELOAD=1 FINALPACKAGE=0
 
-      # --------------------------------
-      # Create draft release
-      # --------------------------------
-      - name: Create Draft Release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          tag_name: build-${{ github.run_number }}
-          name: YTUHD CI Build ${{ github.run_number }}
-          files: ${{ steps.dylib.outputs.file }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # -----------------------------
+    # Find dylib
+    # -----------------------------
+    - name: Locate dylib
+      id: dylib
+      run: |
+        FILE=$(find .theos -name "YTUHD.dylib" | head -n 1)
+        echo "file=$FILE" >> $GITHUB_OUTPUT
+        echo "Found $FILE"
+
+    # -----------------------------
+    # Upload draft release
+    # -----------------------------
+    - name: Draft Release
+      uses: softprops/action-gh-release@v2
+      with:
+        draft: true
+        tag_name: build-${{ github.run_number }}
+        name: YTUHD Build ${{ github.run_number }}
+        files: ${{ steps.dylib.outputs.file }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOK
